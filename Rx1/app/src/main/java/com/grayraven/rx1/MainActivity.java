@@ -3,7 +3,6 @@ package com.grayraven.rx1;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -19,12 +18,16 @@ import java.net.HttpURLConnection;
 
 import rx.Observable;
 import rx.Subscriber;
+import rx.Subscription;
+import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Func0;
+import rx.schedulers.Schedulers;
 
 public class MainActivity extends AppCompatActivity {
 
-    FloatingActionButton fab;
-    static final String TAG = "RxMainActivity";
+    private FloatingActionButton fab;
+    private static final String TAG = "RxMainActivity";
+    private Subscription sizeSubscription;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,26 +40,39 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-              getBitmapSizeObservable().subscribe(new Subscriber<Integer>() {
-                  @Override
-                  public void onCompleted() {
-                    Log.d(TAG,"Observable complete");
-                  }
+                sizeSubscription =  getBitmapSizeObservable()
+                      .subscribeOn(Schedulers.io()) //use the 'io' thread for this task
+                      .observeOn(AndroidSchedulers.mainThread()) // pass the results to the main UI thread
+                      .subscribe(new Subscriber<Integer>() {
+                          @Override
+                          public void onCompleted() {
+                              Log.d(TAG, "Observable complete");
+                              sizeSubscription.unsubscribe();
+                          }
 
-                  @Override
-                  public void onError(Throwable e) {
-                      Log.e(TAG, "Observable error: " + e.getMessage());
-                  }
+                          @Override
+                          public void onError(Throwable e) {
+                              Log.e(TAG, "Observable error: " + e.getMessage());
+                          }
 
-                  @Override
-                  public void onNext(Integer size) {
-                      Log.d(TAG,"Observable onNext");
-                      Snackbar.make(fab, "Bitmap size: " + size, Snackbar.LENGTH_LONG).setAction("Action", null).show();
-                  }
-              });
+                          @Override
+                          public void onNext(Integer size) {
+                              Log.d(TAG, "Observable onNext");
+                              Snackbar.make(fab, "Bitmap size: " + size, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                          }
+                      });
 
             }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        //recommended practice to avoid leaks
+        if(sizeSubscription !=null && !sizeSubscription.isUnsubscribed()) {
+            sizeSubscription.unsubscribe();
+        }
     }
 
     @Override
@@ -84,13 +100,13 @@ public class MainActivity extends AppCompatActivity {
     @NonNull
     private Integer getBitmapSize() {
         try {
-            String theUrl = "http://grayraven.com/MarinaProject/RAY.BMP";
+            String theUrl = "https://homepages.cae.wisc.edu/~ece533/images/airplane.png";
             java.net.URL url = new java.net.URL(theUrl);
             HttpURLConnection connection = (HttpURLConnection) url
                     .openConnection();
             connection.setDoInput(true);
             connection.connect();
-            InputStream input = connection.getInputStream();
+            InputStream input = connection.getInputStream();As
             Bitmap myBitmap = BitmapFactory.decodeStream(input);
             return myBitmap.getByteCount();
         } catch (IOException e) {
@@ -108,36 +124,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 }
-
-
-
-  /*  private class DownloadBitmap extends AsyncTask<String, Void, Integer> {
-        @Override
-        protected void onPostExecute(Integer result) {
-            super.onPostExecute(result);
-            Log.d("TEST", "Bitmap size: " + result);
-            Snackbar.make(fab, "Bitmap size: " + result, Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show();
-        }
-
-        @Override
-        protected Integer doInBackground(String... urls) {
-
-            try {
-                java.net.URL url = new java.net.URL(urls[0]);
-                HttpURLConnection connection = (HttpURLConnection) url
-                        .openConnection();
-                connection.setDoInput(true);
-                connection.connect();
-                InputStream input = connection.getInputStream();
-                Bitmap myBitmap = BitmapFactory.decodeStream(input);
-                return myBitmap.getByteCount();
-            } catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
-        }
-    }*/
 
 
 
