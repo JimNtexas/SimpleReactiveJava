@@ -2,8 +2,8 @@ package com.grayraven.rx1;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -17,9 +17,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 
+import rx.Observable;
+import rx.Subscriber;
+import rx.functions.Func0;
+
 public class MainActivity extends AppCompatActivity {
 
     FloatingActionButton fab;
+    static final String TAG = "RxMainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,11 +37,23 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                /*Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();*/
-                DownloadBitmap downloadBitmap = new DownloadBitmap();
-                String theUrl = "http://grayraven.com/MarinaProject/RAY.BMP";
-                downloadBitmap.execute(theUrl);
+              getBitmapSizeObservable().subscribe(new Subscriber<Integer>() {
+                  @Override
+                  public void onCompleted() {
+                    Log.d(TAG,"Observable complete");
+                  }
+
+                  @Override
+                  public void onError(Throwable e) {
+                      Log.e(TAG, "Observable error: " + e.getMessage());
+                  }
+
+                  @Override
+                  public void onNext(Integer size) {
+                      Log.d(TAG,"Observable onNext");
+                      Snackbar.make(fab, "Bitmap size: " + size, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                  }
+              });
 
             }
         });
@@ -64,7 +81,37 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private class DownloadBitmap extends AsyncTask<String, Void, Integer> {
+    @NonNull
+    private Integer getBitmapSize() {
+        try {
+            String theUrl = "http://grayraven.com/MarinaProject/RAY.BMP";
+            java.net.URL url = new java.net.URL(theUrl);
+            HttpURLConnection connection = (HttpURLConnection) url
+                    .openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap myBitmap = BitmapFactory.decodeStream(input);
+            return myBitmap.getByteCount();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    public Observable<Integer> getBitmapSizeObservable() {
+        return Observable.defer(new Func0<Observable<Integer>>() {
+            @Override
+            public Observable<Integer> call() {
+                return Observable.just(getBitmapSize());
+            }
+        });
+    }
+}
+
+
+
+  /*  private class DownloadBitmap extends AsyncTask<String, Void, Integer> {
         @Override
         protected void onPostExecute(Integer result) {
             super.onPostExecute(result);
@@ -90,6 +137,8 @@ public class MainActivity extends AppCompatActivity {
                 return null;
             }
         }
-    }
+    }*/
 
-}
+
+
+
